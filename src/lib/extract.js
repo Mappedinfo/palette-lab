@@ -339,3 +339,133 @@ export async function fileToImageData(file, maxDim = 800) {
     URL.revokeObjectURL(url);
   }
 }
+
+// ─── 手动精提：区域主色 / 点采样 / 沿线采样 ───────────────────────────
+
+/** 取像素（含边界保护） */
+function pixelAt(imageData, x, y) {
+  const { data, width, height } = imageData;
+  if (x < 0 || y < 0 || x >= width || y >= height) return null;
+  const i = (y * width + x) * 4;
+  return [data[i], data[i + 1], data[i + 2]];
+}
+
+/**
+ * 点采样：取 (x,y) 周围 radius 半径邻域的平均色（吸管工具）。
+ */
+export function samplePoint(imageData, x, y, radius = 4) {
+  const { width, height } = imageData;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const p = pixelAt(imageData, x + dx, y + dy);
+      if (p) {
+        r += p[0];
+        g += p[1];
+        b += p[2];
+        n++;
+      }
+    }
+  }
+  if (!n) return null;
+  const rgb = [r / n, g / n, b / n].map((v) => Math.round(v));
+  const hex = rgbToHex(rgb);
+  return { hex, rgb, hsl: hexToHsl(hex) };
+}
+
+/**
+ * 区域主色：对给定像素集合做中位切分，返回占比最高的 1~n 个代表色。
+ * @param {ImageData} imageData
+ * @param {Array<[x,y]>} points 区域内像素坐标
+ * @param {number} count 返回代表色数量
+ * @param {object} opts { minDistance: 合并阈值 }
+ */
+export function dominantColorInRegion(imageData, points, count = 1, opts = {}) {
+  const { minDistance = 40 } = opts;
+  if (!points.length) return [];
+  // 去重像素 + 采样上限（避免超大数据）
+  const seen = new Set();
+  const sampled = [];
+  const step = Math.max(1, Math.floor(points.length / 6000));
+  for (let i = 0; i < points.length; i += step) {
+    const [x, y] = points[i];
+    const key = `${x},${y}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const p = pixelAt(imageData, x, y);
+    if (p) sampled.push({ rgb: p, weight: 1 });
+  }
+  if (!sampled.length) return [];
+  const boxes = medianCut(sampled, count);
+  const merged = mergeSimilar(boxes, minDistance);
+  const total = merged.reduce((s, b) => s + b.weight, 0);
+  return merged
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, count)
+    .map((b) => {
+      const rgb = [b.r, b.g, b.b].map((v) => Math.round(v));
+      const hex = rgbToHex(rgb);
+      return { hex, rgb, hsl: hexToHsl(hex), weight: b.weight / total };
+    });
+}
+
+/**
+ * 沿线采样：沿折线路径等距取 n 个采样点，每点邻域平均（色带工具）。
+ * 返回按路径顺序排列的颜色，并剔除与前一色过于接近的重复项。
+ * @param {ImageData} imageData
+ * @param {Array<[x,y]>} path 折线顶点（图片坐标）
+ * @param {number} count 期望采样点数
+ * @param {object} opts { radius: 邻域半径, minDelta: 去重阈值, includePos: 是否附带路径位置 }
+ */
+export function sampleLineColors(imageData, path, count = 8, opts = {}) {
+  const { radius = 5, minDelta = 12, includePos = false } = opts;
+  if (path.length < 2 || count < 2) return [];
+
+  // 1. 计算折线累积长度
+  const segLens = [];
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const dx = path[i][0] - path[i - 1][0];
+    const dy = path[i][1] - path[i - 1][1];
+    const l = Math.sqrt(dx * dx + dy * dy);
+    segLens.push(l);
+    total += l;
+  }
+  if (total < 1) return [];
+
+  // 2. 等距取采样点
+  const samples = [];
+  for (let k = 0; k < count; k++) {
+    const target = (k / (count - 1)) * total;
+    let acc = 0;
+    let pos = [path[0][0], path[0][1]];
+    for (let i = 0; i < segLens.length; i++) {
+      if (acc + segLens[i] >= target || i === segLens.length - 1) {
+        const t = segLens[i] ? (target - acc) / segLens[i] : 0;
+        pos = [
+          path[i][0] + (path[i + 1][0] - path[i][0]) * t,
+          path[i][1] + (path[i + 1][1] - path[i][1]) * t,
+        ];
+        break;
+      }
+      acc += segLens[i];
+    }
+    const c = samplePoint(imageData, Math.round(pos[0]), Math.round(pos[1]), radius);
+    if (c) samples.push({ ...c, pos: k / (count - 1) });
+  }
+
+  // 3. 剔除相邻过近的颜色（保留首尾）
+  const result = [];
+  for (const s of samples) {
+    const last = result[result.length - 1];
+    if (last && colorDist(last.rgb, s.rgb) < minDelta && result.length > 1 && s.pos < 0.98) {
+      continue;
+    }
+    result.push(s);
+  }
+  if (!result.length) return samples;
+  return includePos ? result : result.map(({ pos, ...rest }) => rest);
+}
