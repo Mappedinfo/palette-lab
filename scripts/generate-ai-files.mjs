@@ -22,11 +22,12 @@ function colorLines() {
     const lum = luminance(c.hex).toFixed(3);
     const onWhite = contrastRatio(c.hex, '#ffffff').toFixed(2);
     const onBlack = contrastRatio(c.hex, '#000000').toFixed(2);
-    // 角色分类：亮度为主，高饱和中亮色归为强调色（如琥珀、珊瑚）
+    // 角色分类：亮度主导；浅色基底 > 深色（文字/强调）> 高饱和强调 > 中性数据色
     let role;
     if (lum > 0.75) role = '浅色基底（适合大面积背景/填充）';
+    else if (lum < 0.35) role = '深色（适合文字/强调）';
     else if (hsl.s > 70) role = '高饱和强调色（适合数据点/标注，勿作正文）';
-    else role = '深色（适合文字/强调）';
+    else role = '中性数据色（适合图表序列）';
     return `- ${c.name}（${c.en}）| HEX ${c.hex.toUpperCase()} | RGB ${r},${g},${b} | HSL ${hsl.h}°,${hsl.s}%,${hsl.l}% | 亮度 ${lum} | 白底对比度 ${onWhite}:1 | 黑底对比度 ${onBlack}:1 | ${role} | 所属组 ${c.group}`;
   }).join('\n');
 }
