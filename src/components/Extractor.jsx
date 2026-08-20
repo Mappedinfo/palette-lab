@@ -94,8 +94,8 @@ export default function Extractor({ onCompare }) {
   const [advice, setAdvice] = useState(null);
   const [tool, setTool] = useState('rect');
   const [lineCount, setLineCount] = useState(8);
-  const [manualColors, setManualColors] = useState([]); // 手动提取的单色
-  const [manualLine, setManualLine] = useState([]); // 手动提取的色带序列
+  const [manualColors, setManualColors] = useState([]); // 手动提取的单色（多次追加）
+  const [manualLines, setManualLines] = useState([]); // 手动提取的色带序列（多条独立保存）
   const fileInputRef = useRef(null);
   const dropRef = useRef(null);
   const canvasRef = useRef(null);
@@ -235,7 +235,7 @@ export default function Extractor({ onCompare }) {
       // 吸管：点击即取
       const c = samplePoint(imgDataRef.current, imgPt[0], imgPt[1], 4);
       if (c) {
-        setManualColors((prev) => [...prev, { ...c, weight: null, tag: '吸管' }]);
+        setManualColors((prev) => [...prev, { ...c, weight: null, tag: '吸管', id: Date.now() + Math.random() }]);
         gesture.current = { mode: 'dropper', start: { x, y } };
         redraw();
         setTimeout(() => {
@@ -309,18 +309,21 @@ export default function Extractor({ onCompare }) {
       if (points.length < 8) return;
       const dom = dominantColorInRegion(img, points, 1);
       if (dom.length) {
-        setManualColors((prev) => [...prev, { ...dom[0], weight: null, tag: '框选' }]);
+        setManualColors((prev) => [...prev, { ...dom[0], weight: null, tag: '框选', id: Date.now() + Math.random() }]);
       }
     } else if (g.mode === 'brush') {
       if (g.imgPoints.length < 4) return;
       const dom = dominantColorInRegion(img, g.imgPoints, 1, { minDistance: 50 });
       if (dom.length) {
-        setManualColors((prev) => [...prev, { ...dom[0], weight: null, tag: '涂抹' }]);
+        setManualColors((prev) => [...prev, { ...dom[0], weight: null, tag: '涂抹', id: Date.now() + Math.random() }]);
       }
     } else if (g.mode === 'line') {
       if (g.imgPoints.length < 2) return;
       const seq = sampleLineColors(img, g.imgPoints, lineCount, { radius: 5 });
-      if (seq.length >= 2) setManualLine(seq);
+      if (seq.length >= 2) {
+        // 每次划线都保存为一条独立色带
+        setManualLines((prev) => [...prev, { id: Date.now(), colors: seq }]);
+      }
     }
   };
 
@@ -343,7 +346,7 @@ export default function Extractor({ onCompare }) {
       setPalette(extracted);
       setAdvice(recommendForPlotting(extracted));
       setManualColors([]);
-      setManualLine([]);
+      setManualLines([]);
       setStatus('done');
       // 等 DOM 渲染后初始化画布
       setTimeout(redraw, 80);
@@ -411,7 +414,7 @@ export default function Extractor({ onCompare }) {
     setError(null);
     setFileName(null);
     setManualColors([]);
-    setManualLine([]);
+    setManualLines([]);
     imgDataRef.current = null;
     gesture.current = null;
   };
@@ -420,8 +423,8 @@ export default function Extractor({ onCompare }) {
   const [copiedReport, setCopiedReport] = useState(false);
 
   const buildReport = useCallback(() =>
-    buildExtractMarkdown({ fileName, palette, advice, manualColors, manualLine }),
-  [fileName, palette, advice, manualColors, manualLine]);
+    buildExtractMarkdown({ fileName, palette, advice, manualColors, manualLines }),
+  [fileName, palette, advice, manualColors, manualLines]);
 
   const copyReport = async () => {
     try {
@@ -573,8 +576,8 @@ export default function Extractor({ onCompare }) {
                     )}
                     <button
                       className="extract__tool extract__tool--clear"
-                      onClick={() => { setManualColors([]); setManualLine([]); }}
-                      disabled={!manualColors.length && !manualLine.length}
+                      onClick={() => { setManualColors([]); setManualLines([]); }}
+                      disabled={!manualColors.length && !manualLines.length}
                       title="清空手动提取"
                     >
                       <Eraser size={14} /> 清空
@@ -625,52 +628,82 @@ export default function Extractor({ onCompare }) {
                     ))}
                   </div>
 
-                  {/* 手动提取：单色 */}
+                  {/* 手动提取：单色（多次框选/涂抹/吸管，可单独删除） */}
                   {manualColors.length > 0 && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
                       <div className="extract__block-label">手动提取 · {manualColors.length} 色</div>
                       <div className="extract__swatches">
                         {manualColors.map((c, i) => (
-                          <ResultSwatch
-                            key={`m${i}-${c.hex}`}
-                            color={c}
-                            index={i}
-                            onCompare={onCompare}
-                            tag={c.tag}
-                          />
+                          <div key={c.id ?? `m${i}-${c.hex}`} className="result-swatch-wrap">
+                            <ResultSwatch
+                              color={c}
+                              index={i}
+                              onCompare={onCompare}
+                              tag={c.tag}
+                            />
+                            <button
+                              className="result-swatch-del"
+                              onClick={() => setManualColors((prev) => prev.filter((x) => x !== c))}
+                              title={`删除 ${c.hex}`}
+                              aria-label={`删除 ${c.hex}`}
+                            >
+                              <Eraser size={11} />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </motion.div>
                   )}
 
-                  {/* 手动提取：色带 */}
-                  {manualLine.length > 1 && (
+                  {/* 手动提取：色带（多条独立保存，可单独删除） */}
+                  {manualLines.length > 0 && (
                     <motion.div
-                      className="extract__line-result"
+                      className="extract__lines-result"
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                     >
-                      <div className="extract__block-label">色带提取 · {manualLine.length} 段</div>
-                      <div className="extract__line-bar">
-                        {manualLine.map((c, i) => (
-                          <motion.div
-                            key={i}
-                            className="extract__line-seg"
-                            style={{ background: c.hex }}
-                            initial={{ flex: 0 }}
-                            animate={{ flex: 1 }}
-                            transition={{ duration: 0.5, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                            title={`${c.hex}`}
-                            onClick={() => onCompare(c.hex)}
-                          />
-                        ))}
-                      </div>
-                      <div className="extract__line-swatches">
-                        {manualLine.map((c, i) => (
-                          <ResultSwatch key={i} color={{ ...c, weight: null }} index={i} onCompare={onCompare} />
-                        ))}
-                      </div>
+                      <div className="extract__block-label">色带提取 · {manualLines.length} 条</div>
+                      {manualLines.map((line, li) => (
+                        <motion.div
+                          key={line.id}
+                          className="extract__line-result"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.45, delay: li * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                          <div className="extract__line-head">
+                            <span className="extract__line-title">色带 {li + 1} · {line.colors.length} 段</span>
+                            <button
+                              className="result-swatch-del"
+                              onClick={() => setManualLines((prev) => prev.filter((x) => x.id !== line.id))}
+                              title={`删除色带 ${li + 1}`}
+                              aria-label={`删除色带 ${li + 1}`}
+                            >
+                              <Eraser size={11} /> 删除
+                            </button>
+                          </div>
+                          <div className="extract__line-bar">
+                            {line.colors.map((c, i) => (
+                              <motion.div
+                                key={i}
+                                className="extract__line-seg"
+                                style={{ background: c.hex }}
+                                initial={{ flex: 0 }}
+                                animate={{ flex: 1 }}
+                                transition={{ duration: 0.5, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                                title={`${c.hex}`}
+                                onClick={() => onCompare(c.hex)}
+                              />
+                            ))}
+                          </div>
+                          <div className="extract__line-swatches">
+                            {line.colors.map((c, i) => (
+                              <ResultSwatch key={i} color={{ ...c, weight: null }} index={i} onCompare={onCompare} />
+                            ))}
+                          </div>
+                        </motion.div>
+                      ))}
                     </motion.div>
                   )}
                 </div>

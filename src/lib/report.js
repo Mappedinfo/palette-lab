@@ -43,9 +43,9 @@ function swatchRow(c, extra = '') {
  * @param {Array} opts.palette 自动提取主色 [{hex, rgb, hsl, weight}]
  * @param {object|null} opts.advice recommendForPlotting 输出
  * @param {Array} opts.manualColors 手动单色 [{hex, rgb, hsl, tag}]
- * @param {Array} opts.manualLine 色带序列 [{hex, rgb, hsl}]
+ * @param {Array} opts.manualLines 多条色带 [{id, colors: [{hex, rgb, hsl}]}]
  */
-export function buildExtractMarkdown({ fileName, palette, advice, manualColors, manualLine }) {
+export function buildExtractMarkdown({ fileName, palette, advice, manualColors, manualLines }) {
   const lines = [];
   const now = new Date();
   const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -78,18 +78,28 @@ export function buildExtractMarkdown({ fileName, palette, advice, manualColors, 
     lines.push('');
   }
 
-  // 3. 色带序列
-  if (manualLine?.length >= 2) {
+  // 3. 色带序列（多条）
+  const lineList = Array.isArray(manualLines)
+    ? manualLines.map((l) => (Array.isArray(l) ? l : l?.colors || []))
+    : [];
+  if (lineList.some((l) => l.length >= 2)) {
     lines.push('## 3. 色带序列');
     lines.push('');
-    lines.push(manualLine.map((c) => `\`${c.hex.toUpperCase()}\``).join(' → '));
-    lines.push('');
-    lines.push('| # | HEX | RGB | HSL |');
-    lines.push('|---|---|---|---|');
-    manualLine.forEach((c, i) => {
-      lines.push(`| ${i + 1} | \`${c.hex.toUpperCase()}\` | ${rgbStr(c)} | ${hslStr(c)} |`);
+    lineList.forEach((seq, li) => {
+      if (seq.length < 2) return;
+      if (lineList.length > 1) {
+        lines.push(`### 色带 ${li + 1}`);
+        lines.push('');
+      }
+      lines.push(seq.map((c) => `\`${c.hex.toUpperCase()}\``).join(' → '));
+      lines.push('');
+      lines.push('| # | HEX | RGB | HSL |');
+      lines.push('|---|---|---|---|');
+      seq.forEach((c, i) => {
+        lines.push(`| ${i + 1} | \`${c.hex.toUpperCase()}\` | ${rgbStr(c)} | ${hslStr(c)} |`);
+      });
+      lines.push('');
     });
-    lines.push('');
   }
 
   // 4. 绘图建议
@@ -153,7 +163,8 @@ export function buildExtractMarkdown({ fileName, palette, advice, manualColors, 
   // 5. 全部颜色总表（合并去重）
   const all = [];
   const seen = new Set();
-  [...(palette || []), ...(manualColors || []), ...(manualLine || [])].forEach((c) => {
+  const lineFlat = lineList.flat();
+  [...(palette || []), ...(manualColors || []), ...lineFlat].forEach((c) => {
     if (c?.hex && !seen.has(c.hex)) {
       seen.add(c.hex);
       all.push(c);
