@@ -9,6 +9,7 @@ import GroupShowcase from './components/GroupShowcase';
 import ColorModal from './components/ColorModal';
 import CompareOverlay from './components/CompareOverlay';
 import TheaterMode from './components/TheaterMode';
+import Extractor from './components/Extractor';
 import Footer from './components/Footer';
 
 const THEME_KEY = 'palette-lab-theme';
@@ -86,6 +87,8 @@ export default function App() {
             <GroupShowcase groups={GROUPS} onCompare={(pair) => setCompare({ a: pair[0], b: pair[1] })} onTheater={setTheater} />
           </div>
         </section>
+
+        <Extractor onCompare={(hex) => setCompare({ a: hex, b: null })} />
       </main>
 
       <Footer />
