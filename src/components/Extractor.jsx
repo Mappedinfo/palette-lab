@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Brush, Check, ClipboardPaste, Download, Eraser, FileText, ImagePlus,
-  Loader2, MousePointerClick, RefreshCw, Scan, Sparkles, Square, UploadCloud, Slash,
+  Loader2, Maximize2, Minus, MousePointerClick, Plus, RefreshCw, Scan,
+  Sparkles, Square, UploadCloud, Slash, X,
 } from 'lucide-react';
 import {
   extractPaletteFromImageData, fileToImageData, recommendForPlotting,
@@ -100,30 +101,67 @@ export default function Extractor({ onCompare }) {
   const dropRef = useRef(null);
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
+  const fsCanvasRef = useRef(null); // 全屏画布
+  const fsWrapRef = useRef(null);
   const imgDataRef = useRef(null); // 原始 ImageData（图片坐标）
 
   // ── 交互画布状态（ref 避免闭包） ──
-  const gesture = useRef(null); // {mode, start, current, points, minX,minY,maxX,maxY}
+  const gesture = useRef(null); // {mode, start, current, points, imgPoints, minX,minY,maxX,maxY}（点均为图片坐标）
+  const panning = useRef(null); // {startX, startY, panX, panY}
+  const spaceRef = useRef(false); // 空格键按下（平移模式）
+  const lastDownRef = useRef({ t: 0, x: 0, y: 0 }); // 双击检测
 
-  // ── 图片坐标换算：canvas CSS 坐标 → ImageData 像素坐标 ──
-  const cssToImg = useCallback((cx, cy) => {
-    const canvas = canvasRef.current;
-    const img = imgDataRef.current;
-    if (!canvas || !img) return null;
+  // ── 视图状态：缩放 + 平移 ──
+  const [view, setView] = useState({ zoom: 1, pan: { x: 0, y: 0 } });
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const resetView = useCallback(() => {
+    setView({ zoom: 1, pan: { x: 0, y: 0 } });
+  }, []);
+
+  /** 图片 contain 基准矩形（zoom=1, pan=0） */
+  const baseRect = useCallback((canvas, img) => {
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
     const scale = Math.min(cw / img.width, ch / img.height);
-    const offX = (cw - img.width * scale) / 2;
-    const offY = (ch - img.height * scale) / 2;
-    return [
-      Math.round((cx - offX) / scale),
-      Math.round((cy - offY) / scale),
-    ];
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    return {
+      scale,
+      dx: (cw - dw) / 2,
+      dy: (ch - dh) / 2,
+      cx: cw / 2,
+      cy: ch / 2,
+    };
   }, []);
 
-  // ── 重绘画布：图片 + 当前手势覆盖层 ──
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
+  /** canvas CSS 坐标 → ImageData 像素坐标（含 zoom/pan） */
+  const cssToImg = useCallback((canvas, cx, cy) => {
+    const img = imgDataRef.current;
+    if (!canvas || !img) return null;
+    const base = baseRect(canvas, img);
+    const scale = base.scale * view.zoom;
+    const dx = base.cx + (base.dx - base.cx) * view.zoom + view.pan.x;
+    const dy = base.cy + (base.dy - base.cy) * view.zoom + view.pan.y;
+    return [
+      Math.round((cx - dx) / scale),
+      Math.round((cy - dy) / scale),
+    ];
+  }, [baseRect, view]);
+
+  /** ImageData 像素坐标 → canvas CSS 坐标（含 zoom/pan） */
+  const imgToCss = useCallback((canvas, ix, iy) => {
+    const img = imgDataRef.current;
+    if (!canvas || !img) return [0, 0];
+    const base = baseRect(canvas, img);
+    const scale = base.scale * view.zoom;
+    const dx = base.cx + (base.dx - base.cx) * view.zoom + view.pan.x;
+    const dy = base.cy + (base.dy - base.cy) * view.zoom + view.pan.y;
+    return [ix * scale + dx, iy * scale + dy];
+  }, [baseRect, view]);
+
+  // ── 绘制单个画布：图片 + 当前手势覆盖层 ──
+  const drawCanvas = useCallback((canvas) => {
     const img = imgDataRef.current;
     const g = gesture.current;
     if (!canvas || !img) return;
@@ -131,7 +169,6 @@ export default function Extractor({ onCompare }) {
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
     if (!cw || !ch) return;
-    // 无条件同步画布位图尺寸（每次重绘都会重画，无需比较）
     canvas.width = Math.round(cw * dpr);
     canvas.height = Math.round(ch * dpr);
     const ctx = canvas.getContext('2d');
@@ -147,25 +184,32 @@ export default function Extractor({ onCompare }) {
       }
     }
 
-    // 绘制图片（contain）
-    const scale = Math.min(cw / img.width, ch / img.height);
+    // 绘制图片（contain + zoom/pan）
+    const base = baseRect(canvas, img);
+    const scale = base.scale * view.zoom;
     const dw = img.width * scale;
     const dh = img.height * scale;
-    const dx = (cw - dw) / 2;
-    const dy = (ch - dh) / 2;
+    const dx = base.cx + (base.dx - base.cx) * view.zoom + view.pan.x;
+    const dy = base.cy + (base.dy - base.cy) * view.zoom + view.pan.y;
     const tmp = document.createElement('canvas');
     tmp.width = img.width;
     tmp.height = img.height;
     tmp.getContext('2d').putImageData(img, 0, 0);
     ctx.drawImage(tmp, dx, dy, dw, dh);
+    // 图片边界
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(dx, dy, dw, dh);
 
-    // 手势覆盖层
+    // 手势覆盖层（点以图片坐标存储，转回 canvas 坐标绘制，随缩放正确）
     if (!g) return;
-    if (g.mode === 'rect' && g.start && g.current) {
-      const x = Math.min(g.start.x, g.current.x);
-      const y = Math.min(g.start.y, g.current.y);
-      const w = Math.abs(g.current.x - g.start.x);
-      const h = Math.abs(g.current.y - g.start.y);
+    if (g.mode === 'rect' && g.start) {
+      const [x1, y1] = imgToCss(canvas, g.minX, g.minY);
+      const [x2, y2] = imgToCss(canvas, g.maxX, g.maxY);
+      const x = Math.min(x1, x2);
+      const y = Math.min(y1, y2);
+      const w = Math.abs(x2 - x1);
+      const h = Math.abs(y2 - y1);
       ctx.fillStyle = 'rgba(238,25,105,0.18)';
       ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = '#ee1969';
@@ -173,20 +217,26 @@ export default function Extractor({ onCompare }) {
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(x, y, w, h);
       ctx.setLineDash([]);
-    } else if (g.mode === 'brush' && g.points.length) {
+    } else if (g.mode === 'brush' && g.imgPoints.length) {
       ctx.strokeStyle = 'rgba(238,25,105,0.85)';
-      ctx.lineWidth = 14;
+      ctx.lineWidth = 14 * view.zoom;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
-      g.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      g.imgPoints.forEach(([ix, iy], i) => {
+        const [px, py] = imgToCss(canvas, ix, iy);
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      });
       ctx.stroke();
-    } else if (g.mode === 'line' && g.points.length > 1) {
+    } else if (g.mode === 'line' && g.imgPoints.length > 1) {
       ctx.strokeStyle = 'rgba(255,255,255,0.95)';
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      g.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      g.imgPoints.forEach(([ix, iy], i) => {
+        const [px, py] = imgToCss(canvas, ix, iy);
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      });
       ctx.stroke();
       ctx.strokeStyle = '#ee1969';
       ctx.lineWidth = 1.5;
@@ -194,9 +244,10 @@ export default function Extractor({ onCompare }) {
       ctx.stroke();
       ctx.setLineDash([]);
       // 端点
-      const sp = g.points[0];
-      const ep = g.points[g.points.length - 1];
-      for (const [px, py] of [[sp.x, sp.y], [ep.x, ep.y]]) {
+      const sp = g.imgPoints[0];
+      const ep = g.imgPoints[g.imgPoints.length - 1];
+      for (const [ix, iy] of [sp, ep]) {
+        const [px, py] = imgToCss(canvas, ix, iy);
         ctx.beginPath();
         ctx.arc(px, py, 6, 0, Math.PI * 2);
         ctx.fillStyle = '#ee1969';
@@ -206,37 +257,63 @@ export default function Extractor({ onCompare }) {
         ctx.stroke();
       }
     } else if (g.mode === 'dropper' && g.start) {
+      const [px, py] = imgToCss(canvas, g.start[0], g.start[1]);
       ctx.beginPath();
-      ctx.arc(g.start.x, g.start.y, 10, 0, Math.PI * 2);
+      ctx.arc(px, py, 10, 0, Math.PI * 2);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(g.start.x, g.start.y, 10, 0, Math.PI * 2);
+      ctx.arc(px, py, 10, 0, Math.PI * 2);
       ctx.strokeStyle = '#ee1969';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-  }, []);
+  }, [baseRect, imgToCss, view]);
 
-  // ── 手势开始 ──
+  // ── 重绘两个画布 ──
+  const redraw = useCallback(() => {
+    if (canvasRef.current) drawCanvas(canvasRef.current);
+    if (fsCanvasRef.current) drawCanvas(fsCanvasRef.current);
+  }, [drawCanvas]);
+
+  // ── 手势开始（支持普通/全屏两个 canvas，点以图片坐标存储） ──
+  const activeCanvas = () => (fullscreen ? fsCanvasRef.current : canvasRef.current);
+
   const onPointerDown = (e) => {
     if (status !== 'done') return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
+    const canvas = activeCanvas();
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const imgPt = cssToImg(x, y);
+    const imgPt = cssToImg(canvas, x, y);
     if (!imgPt) return;
+
+    // 双击检测：300ms 内同一点两次按下 → 重置视图，不触发工具
+    const now = Date.now();
+    const last = lastDownRef.current;
+    if (now - last.t < 300 && Math.hypot(x - last.x, y - last.y) < 10) {
+      lastDownRef.current = { t: 0, x: 0, y: 0 };
+      resetView();
+      return;
+    }
+    lastDownRef.current = { t: now, x, y };
+
     canvas.setPointerCapture(e.pointerId);
+
+    // 平移模式：空格键按住 或 中键
+    if (spaceRef.current || e.button === 1) {
+      panning.current = { startX: x, startY: y, panX: view.pan.x, panY: view.pan.y };
+      return;
+    }
+
     if (tool === 'dropper') {
       // 吸管：点击即取
       const c = samplePoint(imgDataRef.current, imgPt[0], imgPt[1], 4);
       if (c) {
         setManualColors((prev) => [...prev, { ...c, weight: null, tag: '吸管', id: Date.now() + Math.random() }]);
-        gesture.current = { mode: 'dropper', start: { x, y } };
+        gesture.current = { mode: 'dropper', start: imgPt };
         redraw();
         setTimeout(() => {
           gesture.current = null;
@@ -247,9 +324,7 @@ export default function Extractor({ onCompare }) {
     }
     gesture.current = {
       mode: tool,
-      start: { x, y },
-      current: { x, y },
-      points: [{ x, y }],
+      start: imgPt,
       imgPoints: [imgPt],
       minX: imgPt[0], maxX: imgPt[0], minY: imgPt[1], maxY: imgPt[1],
     };
@@ -257,28 +332,35 @@ export default function Extractor({ onCompare }) {
   };
 
   const onPointerMove = (e) => {
-    const g = gesture.current;
-    if (!g || g.mode === 'dropper') return;
-    const canvas = canvasRef.current;
+    const canvas = activeCanvas();
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const imgPt = cssToImg(x, y);
+
+    // 平移
+    if (panning.current) {
+      const p = panning.current;
+      setView((v) => ({
+        ...v,
+        pan: { x: p.panX + (x - p.startX), y: p.panY + (y - p.startY) },
+      }));
+      return;
+    }
+
+    const g = gesture.current;
+    if (!g || g.mode === 'dropper') return;
+    const imgPt = cssToImg(canvas, x, y);
     if (!imgPt) return;
-    g.current = { x, y };
     if (g.mode === 'rect') {
-      // 框选：直接按当前点更新边界（imgPoints 只存起点终点即可，边界实时算）
-      const [ix, iy] = imgPt;
-      g.minX = Math.min(g.minX, ix);
-      g.maxX = Math.max(g.maxX, ix);
-      g.minY = Math.min(g.minY, iy);
-      g.maxY = Math.max(g.maxY, iy);
+      g.minX = Math.min(g.minX, imgPt[0]);
+      g.maxX = Math.max(g.maxX, imgPt[0]);
+      g.minY = Math.min(g.minY, imgPt[1]);
+      g.maxY = Math.max(g.maxY, imgPt[1]);
     } else if (g.mode === 'brush' || g.mode === 'line') {
-      const last = g.points[g.points.length - 1];
-      const dist = Math.hypot(x - last.x, y - last.y);
-      if (dist > 4) {
-        g.points.push({ x, y });
+      const last = g.imgPoints[g.imgPoints.length - 1];
+      const dist = Math.hypot(imgPt[0] - last[0], imgPt[1] - last[1]);
+      if (dist > 1.5) {
         g.imgPoints.push(imgPt);
         g.minX = Math.min(g.minX, imgPt[0]);
         g.maxX = Math.max(g.maxX, imgPt[0]);
@@ -290,6 +372,10 @@ export default function Extractor({ onCompare }) {
   };
 
   const onPointerUp = () => {
+    if (panning.current) {
+      panning.current = null;
+      return;
+    }
     const g = gesture.current;
     gesture.current = null;
     if (!g || g.mode === 'dropper') return;
@@ -327,6 +413,39 @@ export default function Extractor({ onCompare }) {
     }
   };
 
+  // ── 滚轮缩放（以鼠标为中心，普通/全屏共用） ──
+  const onWheel = useCallback((e) => {
+    if (status !== 'done') return;
+    const canvas = fullscreen ? fsCanvasRef.current : canvasRef.current;
+    if (!canvas || !imgDataRef.current) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+    setView((v) => {
+      const zoom = Math.min(16, Math.max(0.5, v.zoom * factor));
+      if (Math.abs(zoom - v.zoom) < 0.001) return v;
+      const img = imgDataRef.current;
+      const base = baseRect(canvas, img);
+      const oldScale = base.scale * v.zoom;
+      const oldDx = base.cx + (base.dx - base.cx) * v.zoom + v.pan.x;
+      const oldDy = base.cy + (base.dy - base.cy) * v.zoom + v.pan.y;
+      const ix = (mx - oldDx) / oldScale;
+      const iy = (my - oldDy) / oldScale;
+      const newScale = base.scale * zoom;
+      const newDx = mx - ix * newScale;
+      const newDy = my - iy * newScale;
+      return {
+        zoom,
+        pan: {
+          x: newDx - base.cx - (base.dx - base.cx) * zoom,
+          y: newDy - base.cy - (base.dy - base.cy) * zoom,
+        },
+      };
+    });
+  }, [baseRect, fullscreen, status]);
+
   // ── 图片处理 ──
   const processFile = useCallback(async (file) => {
     if (!file || !file.type.startsWith('image/')) {
@@ -348,8 +467,7 @@ export default function Extractor({ onCompare }) {
       setManualColors([]);
       setManualLines([]);
       setStatus('done');
-      // 等 DOM 渲染后初始化画布
-      setTimeout(redraw, 80);
+      // 画布绘制由「就绪轮询」effect 负责（AnimatePresence 延迟挂载）
     } catch (e) {
       setStatus('error');
       setError(e.message || '解析失败，请换一张图片试试');
@@ -358,12 +476,63 @@ export default function Extractor({ onCompare }) {
 
   // ── 画布尺寸自适应 ──
   useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
     const ro = new ResizeObserver(() => redraw());
-    ro.observe(wrap);
+    const wraps = [wrapRef.current, fsWrapRef.current].filter(Boolean);
+    wraps.forEach((w) => ro.observe(w));
     return () => ro.disconnect();
-  }, [redraw, status]);
+  }, [redraw, status, fullscreen]);
+
+  // ── 修复：done 视图经 AnimatePresence 延迟挂载，轮询等 canvas 就绪后绘制 ──
+  useEffect(() => {
+    if (status !== 'done') return;
+    let tries = 0;
+    const t = setInterval(() => {
+      const c = activeCanvas();
+      if (c && c.clientWidth > 0 && c.clientHeight > 0) {
+        clearInterval(t);
+        redraw();
+      } else if (++tries > 50) {
+        clearInterval(t);
+      }
+    }, 60);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, redraw, fullscreen]);
+
+  // ── 空格键（平移模式）+ Esc（退出全屏） ──
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.code === 'Space' && status === 'done') {
+        spaceRef.current = true;
+        e.preventDefault();
+      }
+      if (e.key === 'Escape') setFullscreen(false);
+    };
+    const onKeyUp = (e) => {
+      if (e.code === 'Space') spaceRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [status]);
+
+  // ── 滚轮缩放：原生非 passive 监听（React onWheel 无法 preventDefault） ──
+  useEffect(() => {
+    const bind = (canvas) => {
+      if (!canvas) return;
+      canvas.addEventListener('wheel', onWheel, { passive: false });
+      return canvas;
+    };
+    const c1 = bind(canvasRef.current);
+    const c2 = bind(fsCanvasRef.current);
+    return () => {
+      c1?.removeEventListener('wheel', onWheel);
+      c2?.removeEventListener('wheel', onWheel);
+    };
+  }, [onWheel, status, fullscreen]);
 
   // ── 拖拽 ──
   useEffect(() => {
@@ -602,20 +771,34 @@ export default function Extractor({ onCompare }) {
                     <button className="extract__tool extract__tool--reload" onClick={reset} title="换一张图片">
                       <RefreshCw size={14} /> 换图
                     </button>
+                    <button
+                      className="extract__tool extract__tool--fs"
+                      onClick={() => setFullscreen(true)}
+                      disabled={!palette.length}
+                      title="全屏提取（大画布 + 缩放）"
+                    >
+                      <Maximize2 size={14} /> 全屏
+                    </button>
                   </div>
 
                   <div className="extract__preview-wrap" ref={wrapRef}>
                     <canvas
                       ref={canvasRef}
-                      className={`extract__canvas extract__canvas--${tool}`}
+                      className={`extract__canvas extract__canvas--${tool} ${view.zoom !== 1 ? 'extract__canvas--zoomed' : ''}`}
                       onPointerDown={onPointerDown}
                       onPointerMove={onPointerMove}
                       onPointerUp={onPointerUp}
+                      onDoubleClick={() => resetView()}
                     />
+                    {view.zoom !== 1 && (
+                      <span className="extract__zoom-badge">
+                        {Math.round(view.zoom * 100)}% · 双击重置
+                      </span>
+                    )}
                   </div>
 
                   <p className="extract__tool-hint">
-                    <Scan size={13} /> {activeTool.hint}
+                    <Scan size={13} /> {activeTool.hint} · 滚轮缩放 · 空格/中键拖拽平移
                   </p>
 
                   <PaletteBar palette={palette} />
@@ -794,6 +977,109 @@ export default function Extractor({ onCompare }) {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* ── 全屏提取模式：大画布 + 自由缩放平移 ── */}
+      <AnimatePresence>
+        {fullscreen && status === 'done' && (
+          <motion.div
+            className="extract-fs"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="全屏提取"
+          >
+            {/* 顶栏：工具 + 缩放控件 + 关闭 */}
+            <div className="extract-fs__topbar">
+              <div className="extract-fs__tools">
+                {TOOLS.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      className={`extract__tool ${tool === t.id ? 'extract__tool--active' : ''}`}
+                      onClick={() => setTool(t.id)}
+                      title={t.hint}
+                    >
+                      <Icon size={14} /> {t.label}
+                    </button>
+                  );
+                })}
+                {tool === 'line' && (
+                  <label className="extract__line-count">
+                    采样
+                    <select value={lineCount} onChange={(e) => setLineCount(Number(e.target.value))}>
+                      {[4, 6, 8, 12, 16].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+
+              <div className="extract-fs__zoom">
+                <button className="pill-btn" onClick={() => setView((v) => ({ ...v, zoom: Math.max(0.5, v.zoom / 1.25) }))} title="缩小">
+                  <Minus size={14} />
+                </button>
+                <span className="extract-fs__zoom-pct">{Math.round(view.zoom * 100)}%</span>
+                <button className="pill-btn" onClick={() => setView((v) => ({ ...v, zoom: Math.min(16, v.zoom * 1.25) }))} title="放大">
+                  <Plus size={14} />
+                </button>
+                <button className="pill-btn" onClick={resetView} title="适应窗口 / 双击重置">
+                  适应
+                </button>
+              </div>
+
+              <div className="extract-fs__actions">
+                <span className="extract-fs__hint">滚轮缩放 · 空格/中键拖拽平移 · 双击重置</span>
+                <button className="pill-btn pill-btn--ghost" onClick={() => setFullscreen(false)} title="退出全屏（Esc）">
+                  <X size={15} /> 退出
+                </button>
+              </div>
+            </div>
+
+            {/* 大画布 */}
+            <div className="extract-fs__stage" ref={fsWrapRef}>
+              <canvas
+                ref={fsCanvasRef}
+                className={`extract__canvas extract__canvas--${tool} ${view.zoom !== 1 ? 'extract__canvas--zoomed' : ''}`}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onDoubleClick={() => resetView()}
+              />
+            </div>
+
+            {/* 底部结果条（横向滚动） */}
+            <div className="extract-fs__results">
+              {palette.map((c, i) => (
+                <ResultSwatch key={c.hex + i} color={c} index={i} onCompare={onCompare} />
+              ))}
+              {manualColors.map((c, i) => (
+                <ResultSwatch key={`m${c.id}-${c.hex}`} color={c} index={i} onCompare={onCompare} tag={c.tag} />
+              ))}
+              {manualLines.map((line, li) => (
+                <div key={line.id} className="extract-fs__line">
+                  <span className="extract-fs__line-title">色带 {li + 1}</span>
+                  <div className="extract__line-bar">
+                    {line.colors.map((c, i) => (
+                      <div
+                        key={i}
+                        className="extract__line-seg"
+                        style={{ background: c.hex }}
+                        title={c.hex}
+                        onClick={() => onCompare(c.hex)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
