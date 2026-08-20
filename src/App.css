@@ -1174,7 +1174,29 @@
   border-radius: 0 9px 9px 0;
 }
 
-.extract__tool--clear:disabled {
+.extract__tool--export {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.extract__tool--export:hover {
+  border-color: var(--line-strong);
+}
+
+.extract__tool--exported {
+  background: #008e6b;
+  border-color: #008e6b;
+  color: #fff !important;
+}
+
+.extract__tool--exported:hover {
+  background: #008e6b;
+  color: #fff;
+}
+
+.extract__tool--clear:disabled,
+.extract__tool--export:disabled {
   opacity: 0.35;
   pointer-events: none;
 }

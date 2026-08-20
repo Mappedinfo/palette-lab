@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Brush, ClipboardPaste, Eraser, ImagePlus, Loader2, MousePointerClick,
-  RefreshCw, Scan, Sparkles, Square, UploadCloud, Slash,
+  Brush, Check, ClipboardPaste, Download, Eraser, FileText, ImagePlus,
+  Loader2, MousePointerClick, RefreshCw, Scan, Sparkles, Square, UploadCloud, Slash,
 } from 'lucide-react';
 import {
   extractPaletteFromImageData, fileToImageData, recommendForPlotting,
   simulateColorblind, samplePoint, dominantColorInRegion, sampleLineColors,
 } from '../lib/extract.js';
+import { buildExtractMarkdown } from '../lib/report.js';
 import { contrastRatio, hexToRgb, textOn } from '../data/colors.js';
 
 const COLORBLIND_LABEL = {
@@ -415,6 +416,44 @@ export default function Extractor({ onCompare }) {
     gesture.current = null;
   };
 
+  // ── 导出报告（Markdown / 纯文本） ──
+  const [copiedReport, setCopiedReport] = useState(false);
+
+  const buildReport = useCallback(() =>
+    buildExtractMarkdown({ fileName, palette, advice, manualColors, manualLine }),
+  [fileName, palette, advice, manualColors, manualLine]);
+
+  const copyReport = async () => {
+    try {
+      await navigator.clipboard.writeText(buildReport());
+      setCopiedReport(true);
+      setTimeout(() => setCopiedReport(false), 1600);
+    } catch {
+      // 剪贴板不可用时降级：选中文本提示
+      const ta = document.createElement('textarea');
+      ta.value = buildReport();
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopiedReport(true);
+      setTimeout(() => setCopiedReport(false), 1600);
+    }
+  };
+
+  const downloadReport = () => {
+    const base = (fileName || 'palette').replace(/\.[^.]+$/, '');
+    const blob = new Blob([buildReport()], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${base}-palette-report.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
   const activeTool = TOOLS.find((t) => t.id === tool);
 
   return (
@@ -539,6 +578,23 @@ export default function Extractor({ onCompare }) {
                       title="清空手动提取"
                     >
                       <Eraser size={14} /> 清空
+                    </button>
+                    <button
+                      className={`extract__tool extract__tool--export ${copiedReport ? 'extract__tool--exported' : ''}`}
+                      onClick={copyReport}
+                      disabled={!palette.length}
+                      title="复制提取信息（Markdown 格式）"
+                    >
+                      {copiedReport ? <Check size={14} /> : <FileText size={14} />}
+                      {copiedReport ? '已复制' : '复制信息'}
+                    </button>
+                    <button
+                      className="extract__tool extract__tool--export"
+                      onClick={downloadReport}
+                      disabled={!palette.length}
+                      title="下载为 .md 文件"
+                    >
+                      <Download size={14} /> 下载
                     </button>
                     <button className="extract__tool extract__tool--reload" onClick={reset} title="换一张图片">
                       <RefreshCw size={14} /> 换图
