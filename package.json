@@ -8,7 +8,8 @@
     "prebuild": "node scripts/generate-ai-files.mjs",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:gewu": "vite build --config vite.gewu.config.js"
   },
   "dependencies": {
     "framer-motion": "^13.1.0",

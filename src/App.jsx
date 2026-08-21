@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import './App.css';
+
 import { ALL_COLORS, GROUPS } from './data/colors';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -14,10 +14,24 @@ import Footer from './components/Footer';
 
 const THEME_KEY = 'palette-lab-theme';
 
+/* 在格物插件宿主中，主题作用于宿主容器而非整个文档（避免与宿主主题互相覆盖） */
+const getThemeRoot = () =>
+  (typeof window !== 'undefined' && window.GEWU_PLUGIN?.api?.themeRoot) ||
+  (typeof document !== 'undefined' ? document.documentElement : null);
+
+/* 元素查找：shadow DOM 内的元素对 document 不可见，走宿主 API */
+const findEl = (sel) =>
+  (typeof window !== 'undefined' && window.GEWU_PLUGIN?.api?.find?.(sel)) ||
+  (typeof document !== 'undefined' ? document.querySelector(sel) : null);
+
 export default function App() {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved) return saved;
+    /* 作为格物插件时，初始主题跟随宿主 */
+    if (typeof window !== 'undefined' && window.GEWU_PLUGIN?.api?.theme?.get) {
+      return window.GEWU_PLUGIN.api.theme.get() === 'dark' ? 'dark' : 'light';
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   const [selected, setSelected] = useState(null); // 详情弹窗
@@ -26,7 +40,7 @@ export default function App() {
   const [wipe, setWipe] = useState(null); // 主题切换圆形展开 {color}
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    getThemeRoot()?.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
@@ -56,7 +70,7 @@ export default function App() {
       <Header theme={theme} onToggle={toggleTheme} onTheater={() => setTheater(true)} />
 
       <main>
-        <Hero onExplore={() => document.getElementById('palette')?.scrollIntoView({ behavior: 'smooth' })} />
+        <Hero onExplore={() => findEl('#palette')?.scrollIntoView({ behavior: 'smooth' })} />
 
         <section id="palette" className="section">
           <div className="container">
