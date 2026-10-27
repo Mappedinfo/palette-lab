@@ -1,5 +1,7 @@
+import { COMPOSITION_PRESETS, COLOR_ROLES, SEMANTIC_COLORS } from './compositions.js';
+
 // ─── Palette Lab 数据层 ────────────────────────────────────────────────
-// 15 个颜色按分号分为 8 组搭配，每组由「基底色 + 强调色」构成。
+// 经典搭配保留稳定组 ID；全色档案同时纳入界面角色色和语义色，按 HEX 去重。
 
 export const GROUPS = [
   {
@@ -33,7 +35,7 @@ export const GROUPS = [
     id: 4,
     name: '冰蓝与品红',
     en: 'Ice & Magenta',
-    note: '冷色冰面托起炽热品红，适合阴性/阳性对照表达。',
+    note: '冷色底与鲜明强调，适合汇报重点或艺术对照；不预设阴性／阳性含义。',
     colors: [
       { hex: '#F1F6FF', name: '冰蓝', en: 'Ice' },
       { hex: '#EE1969', name: '品红', en: 'Magenta' },
@@ -43,7 +45,7 @@ export const GROUPS = [
     id: 5,
     name: '薄荷与珊瑚',
     en: 'Mint & Coral',
-    note: '青绿与橙红互为补色（色相差 154°），对比强烈而活泼。',
+    note: '青绿与橙红的暖冷对照，适合表现力强的版面；文字需另查对比度。',
     colors: [
       { hex: '#90E0D6', name: '薄荷', en: 'Mint' },
       { hex: '#E97A46', name: '珊瑚', en: 'Coral' },
@@ -81,9 +83,40 @@ export const GROUPS = [
   },
 ];
 
-export const ALL_COLORS = GROUPS.flatMap((g) =>
+export const LEGACY_COLORS = GROUPS.flatMap((g) =>
   g.colors.map((c) => ({ ...c, group: g.id, groupName: g.name }))
 );
+
+const COLOR_NAMES = {
+  '#FFFFFF': ['纯白', 'White'], '#FFFDF5': ['清暖白', 'Warm White'], '#171A20': ['近黑', 'Ink'],
+  '#475467': ['石板文字', 'Slate'], '#0043CE': ['操作蓝', 'Action Blue'], '#FFF3DA': ['暖米黄', 'Cream Surface'],
+  '#211B18': ['暖墨', 'Warm Ink'], '#584A40': ['棕灰文字', 'Warm Gray'], '#14251E': ['深绿墨', 'Green Ink'],
+  '#435B50': ['绿灰文字', 'Green Gray'], '#1B2130': ['靛墨', 'Indigo Ink'], '#495773': ['蓝灰文字', 'Blue Gray'],
+  '#067647': ['成功绿', 'Success'], '#8A4B00': ['警示赭', 'Warning'], '#B42318': ['错误红', 'Danger'],
+};
+
+const registry = new Map();
+function addColor(color, family, origin, role) {
+  const hex = color.hex.toUpperCase();
+  if (!registry.has(hex)) registry.set(hex, { ...color, hex, families: [], origins: [], roles: [] });
+  const entry = registry.get(hex);
+  if (!entry.families.includes(family)) entry.families.push(family);
+  if (!entry.origins.includes(origin)) entry.origins.push(origin);
+  if (role && !entry.roles.includes(role)) entry.roles.push(role);
+}
+for (const color of LEGACY_COLORS) addColor(color, 'classic', `经典 · ${color.groupName}`, '搭配色');
+for (const preset of COMPOSITION_PRESETS) {
+  for (const { key, label } of COLOR_ROLES) {
+    const hex = preset.colors[key].toUpperCase();
+    const [name, en] = COLOR_NAMES[hex] || [label, key];
+    addColor({ hex, name, en, group: null, groupName: '界面角色' }, 'interface', preset.name, label);
+  }
+}
+for (const hex of Object.values(SEMANTIC_COLORS)) {
+  const [name, en] = COLOR_NAMES[hex];
+  addColor({ hex, name, en, group: null, groupName: '语义状态' }, 'semantic', '界面语义', name);
+}
+export const ALL_COLORS = [...registry.values()];
 
 // ─── 色彩解析工具 ──────────────────────────────────────────────────────
 

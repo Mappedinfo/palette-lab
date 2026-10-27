@@ -288,7 +288,7 @@ export function recommendForPlotting(palette) {
     }
   }
 
-  // 档案映射：每个主色找 15 色档案里最接近的颜色
+  // 档案映射：每个主色查找完整档案中最接近的颜色
   const archiveMatches = palette.slice(0, 6).map((c) => {
     let best = null;
     let bestDist = Infinity;

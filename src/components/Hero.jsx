@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { ArrowDown } from 'lucide-react';
-import { ALL_COLORS } from '../data/colors';
+import { ALL_COLORS, GROUPS } from '../data/colors';
+import { USE_CASES } from '../data/use-cases';
+import { FONT_OPTIONS } from '../data/typography';
 
 const container = {
   hidden: {},
@@ -16,7 +18,7 @@ const item = {
   },
 };
 
-/** 右侧装饰拼贴：15 色随机浮动方块 + 旋转色轮 */
+/** 右侧装饰拼贴：档案色浮动方块 + 旋转色轮 */
 function Collage() {
   const tiles = ALL_COLORS.slice(0, 12);
   return (
@@ -61,7 +63,7 @@ function Collage() {
           />
         );
       })}
-      <div className="hero__collage-center">15</div>
+      <div className="hero__collage-center">{ALL_COLORS.length}</div>
     </motion.div>
   );
 }
@@ -88,25 +90,25 @@ export default function Hero({ onExplore }) {
 
           <motion.p variants={item} className="hero__sub">
             从颜色的面积与角色出发，在清亮页面中试配、对照与导出。
-            15 色档案、8 组搭配和图片提色，继续为图表与界面提供灵感。
+            {ALL_COLORS.length} 色完整档案、{GROUPS.length} 组经典搭配；分场景选色，也比较字号和字体。
           </motion.p>
 
           <motion.div variants={item} className="hero__stats">
             <div className="hero__stat">
-              <b>15</b>
+              <b>{ALL_COLORS.length}</b>
               <span>Colors</span>
             </div>
             <div className="hero__stat">
-              <b>8</b>
+              <b>{GROUPS.length}</b>
               <span>Pairs</span>
             </div>
             <div className="hero__stat">
-              <b>4</b>
-              <span>Starting palettes</span>
+              <b>{USE_CASES.length}</b>
+              <span>Use cases</span>
             </div>
             <div className="hero__stat">
-              <b>∞</b>
-              <span>Combos</span>
+              <b>{FONT_OPTIONS.length}</b>
+              <span>Font choices</span>
             </div>
           </motion.div>
 

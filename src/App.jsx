@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { AnimatePresence } from 'framer-motion';
 
 import { ALL_COLORS, GROUPS } from './data/colors';
 import Header from './components/Header';
 import Hero from './components/Hero';
-import PaletteGrid from './components/PaletteGrid';
+import ColorArchive from './components/ColorArchive';
+import UsageGuide from './components/UsageGuide';
+import TypographyLab from './components/TypographyLab';
+import { getSystemTheme, subscribeSystemTheme } from './lib/system-theme';
 import GroupShowcase from './components/GroupShowcase';
 import ColorModal from './components/ColorModal';
 import CompareOverlay from './components/CompareOverlay';
@@ -13,7 +16,7 @@ import Extractor from './components/Extractor';
 import Footer from './components/Footer';
 import CompositionLab from './components/CompositionLab';
 
-const THEME_KEY = 'palette-lab-theme';
+const serverTheme = () => 'light';
 
 /* 在格物插件宿主中，主题作用于宿主容器而非整个文档（避免与宿主主题互相覆盖） */
 const getThemeRoot = () =>
@@ -26,31 +29,14 @@ const findEl = (sel) =>
   (typeof document !== 'undefined' ? document.querySelector(sel) : null);
 
 export default function App() {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved) return saved;
-    /* 作为格物插件时，初始主题跟随宿主 */
-    if (typeof window !== 'undefined' && window.GEWU_PLUGIN?.api?.theme?.get) {
-      return window.GEWU_PLUGIN.api.theme.get() === 'dark' ? 'dark' : 'light';
-    }
-    return 'light';
-  });
+  const theme = useSyncExternalStore(subscribeSystemTheme, getSystemTheme, serverTheme);
+  const [useCase, setUseCase] = useState('research');
   const [selected, setSelected] = useState(null); // 详情弹窗
   const [compare, setCompare] = useState(null); // {a: hex, b: hex}
   const [theater, setTheater] = useState(false);
-  const [wipe, setWipe] = useState(null); // 主题切换圆形展开 {color}
 
   useEffect(() => {
     getThemeRoot()?.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
-
-  const toggleTheme = useCallback(() => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    // 从按钮位置圆形展开的动效
-    setWipe(next === 'dark' ? '#101114' : '#ffffff');
-    setTimeout(() => setTheme(next), 60);
-    setTimeout(() => setWipe(null), 650);
   }, [theme]);
 
   // 键盘：Esc 关闭全屏层
@@ -68,37 +54,26 @@ export default function App() {
 
   return (
     <>
-      <Header theme={theme} onToggle={toggleTheme} onTheater={() => setTheater(true)} />
+      <Header theme={theme} onTheater={() => setTheater(true)} />
 
       <main>
         <Hero onExplore={() => findEl('#composition')?.scrollIntoView({ behavior: 'smooth' })} />
 
-        <CompositionLab />
+        <UsageGuide active={useCase} onChange={setUseCase} />
+        <CompositionLab useCase={useCase} />
+        <TypographyLab useCase={useCase} />
 
-        <section id="palette" className="section">
-          <div className="container">
-            <div className="section__head">
-              <div>
-                <div className="eyebrow" style={{ marginBottom: 10 }}>01 · 全色档案</div>
-                <h2>15 色 · 逐色解析</h2>
-              </div>
-              <p className="section__desc">
-                点击任意色卡查看 RGB / HSL / 对比度详情；hover 右上角可复制色值。
-              </p>
-            </div>
-            <PaletteGrid colors={ALL_COLORS} onOpen={setSelected} onCompare={(hex) => setCompare({ a: hex, b: null })} />
-          </div>
-        </section>
+        <ColorArchive onOpen={setSelected} onCompare={(hex) => setCompare({ a: hex, b: null })} />
 
         <section id="groups" className="section" style={{ background: 'var(--bg-soft)' }}>
           <div className="container">
             <div className="section__head">
               <div>
                 <div className="eyebrow" style={{ marginBottom: 10 }}>02 · 搭配方案</div>
-                <h2>8 组 · 配色语义</h2>
+                <h2>{GROUPS.length} 组 · 经典搭配</h2>
               </div>
               <p className="section__desc">
-                每组由「基底 + 强调」构成：点击「全屏比较」同屏对照，或「剧场」整组全屏浏览。
+                保留原有灵感搭配；具体用于科研、汇报或创作时，再按用途和实际组合判断。
               </p>
             </div>
             <GroupShowcase groups={GROUPS} onCompare={(pair) => setCompare({ a: pair[0], b: pair[1] })} onTheater={setTheater} />
@@ -137,19 +112,6 @@ export default function App() {
         {theater && <TheaterMode key="theater" colors={ALL_COLORS} onClose={() => setTheater(false)} />}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {wipe && (
-          <motion.div
-            key="wipe"
-            className="theme-wipe"
-            style={{ '--wipe-bg': wipe }}
-            initial={{ scale: 0, opacity: 1 }}
-            animate={{ scale: 4.5, opacity: [1, 1, 0] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-          />
-        )}
-      </AnimatePresence>
     </>
   );
 }

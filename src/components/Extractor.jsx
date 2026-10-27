@@ -966,7 +966,7 @@ export default function Extractor({ onCompare }) {
                           ))}
                         </div>
                         <p className="advice-note">
-                          提取色与 15 色档案中最接近的颜色匹配，方便沿用本站已验证的搭配语义。
+                          提取色与完整档案中的最近色匹配；接近色值不代表该搭配已适合当前用途。
                         </p>
                       </div>
                     </>

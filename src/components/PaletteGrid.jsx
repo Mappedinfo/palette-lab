@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Copy, Check, Expand } from 'lucide-react';
-import { hexToHsl, isLight, textOn } from '../data/colors';
+import { hexToHsl, textOn } from '../data/colors';
 
 const gridVar = {
   hidden: {},
@@ -18,7 +18,7 @@ const cardVar = {
   },
 };
 
-function SwatchCard({ color, index, onOpen, onCompare }) {
+function SwatchCard({ color, onOpen, onCompare }) {
   const [copied, setCopied] = useState(false);
   const hsl = hexToHsl(color.hex);
   const text = textOn(color.hex);
@@ -40,7 +40,7 @@ function SwatchCard({ color, index, onOpen, onCompare }) {
         className="swatch__field"
         style={{ background: color.hex, ['--swatch-text']: text }}
       >
-        <span className="swatch__group-tag">G{color.group}</span>
+        <span className="swatch__group-tag">{color.group ? `G${color.group}` : color.families.includes('semantic') ? '语义' : '界面'}</span>
         <span className="swatch__hex">{color.hex.toUpperCase()}</span>
         <button
           className="swatch__copy"
@@ -56,11 +56,12 @@ function SwatchCard({ color, index, onOpen, onCompare }) {
           {color.name}
           <small>{color.en}</small>
         </div>
+        <p className="swatch__roles" title={color.origins.join(' / ')}>{color.roles.join(' · ')}</p>
         <div className="swatch__spec">
           <span>H{hsl.h}° S{hsl.s}% L{hsl.l}%</span>
           <button
             onClick={(e) => { e.stopPropagation(); onCompare(color.hex); }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink-soft)', fontSize: 11, fontFamily: 'var(--mono)' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink-soft)', fontSize: 14, fontFamily: 'var(--mono)' }}
             title="全屏比较"
           >
             <Expand size={12} /> 比较
@@ -80,8 +81,8 @@ export default function PaletteGrid({ colors, onOpen, onCompare }) {
       whileInView="show"
       viewport={{ once: true, margin: '-60px' }}
     >
-      {colors.map((c, i) => (
-        <SwatchCard key={c.hex} color={c} index={i} onOpen={onOpen} onCompare={onCompare} />
+      {colors.map((c) => (
+        <SwatchCard key={c.hex} color={c} onOpen={onOpen} onCompare={onCompare} />
       ))}
     </motion.div>
   );

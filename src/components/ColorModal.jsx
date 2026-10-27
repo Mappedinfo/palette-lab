@@ -42,8 +42,10 @@ export default function ColorModal({ color, onClose, onCompare }) {
         <div className="modal__body">
           <div className="modal__title">
             <h3>{color.name}</h3>
-            <span>{color.en} · 组 {color.group} · {color.groupName}</span>
+            <span>{color.en} · {color.group ? `经典组 ${color.group}` : color.groupName}</span>
           </div>
+
+          <p className="color-role-detail">角色：{color.roles.join(' · ')}<br />来源：{color.origins.join(' / ')}</p>
 
           <div className="spec-grid">
             <div className="spec-cell">
@@ -63,14 +65,14 @@ export default function ColorModal({ color, onClose, onCompare }) {
           <div className="contrast-row">
             <div className="contrast-cell contrast-cell--onwhite">
               <div>
-                <div style={{ fontSize: 11, opacity: 0.6, fontWeight: 600 }}>白底对比度</div>
+                <div style={{ fontSize: 14, opacity: 0.85, fontWeight: 600 }}>白底对比度</div>
                 <div className="ratio">{onWhite}<small> : 1</small></div>
               </div>
               <span className="sample" style={{ background: color.hex }} />
             </div>
             <div className="contrast-cell contrast-cell--onblack">
               <div>
-                <div style={{ fontSize: 11, opacity: 0.6, fontWeight: 600 }}>黑底对比度</div>
+                <div style={{ fontSize: 14, opacity: 0.85, fontWeight: 600 }}>黑底对比度</div>
                 <div className="ratio">{onBlack}<small> : 1</small></div>
               </div>
               <span className="sample" style={{ background: color.hex }} />

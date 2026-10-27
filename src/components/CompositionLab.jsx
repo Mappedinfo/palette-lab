@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Copy, Download, RotateCcw } from 'lucide-react';
 import { ALL_COLORS, textOn } from '../data/colors';
+import { getUseCase } from '../data/use-cases';
 import { COMPOSITION_PRESETS, COLOR_ROLES, RATIO_PRESETS, SEMANTIC_COLORS } from '../data/compositions';
 import { COMPOSITION_KEY, isHex, normaliseComposition, normaliseRatios, contrastChecks, exportComposition, compositionCSS } from '../lib/composition';
 
@@ -50,7 +51,8 @@ function PagePreview({ mode }) {
   );
 }
 
-export default function CompositionLab() {
+export default function CompositionLab({ useCase }) {
+  const context = getUseCase(useCase);
   const [composition, updateComposition] = useState(() => {
     try { return normaliseComposition(JSON.parse(localStorage.getItem(COMPOSITION_KEY))); }
     catch { return normaliseComposition(null); }
@@ -85,7 +87,7 @@ export default function CompositionLab() {
       <div className="container">
         <div className="section__head"><div><div className="eyebrow">COMPOSITION · 配比实验</div><h2>颜色，更要看面积与角色。</h2></div><p className="section__desc">从清亮底色和高对比文字开始。调整面积、替换色值，在页面里看它们如何相处。</p></div>
         <div className="composition-presets" aria-label="配色起点">{COMPOSITION_PRESETS.map((p) => <button key={p.id} type="button" aria-pressed={composition.presetId === p.id} onClick={() => { setComposition(normaliseComposition({ presetId: p.id })); setNotice(''); }}><span className="composition-preset__colors" aria-hidden="true">{['background', 'surface', 'accent'].map((key) => <i key={key} style={{ background: p.colors[key] }} />)}</span><b>{p.name}</b><span>{p.ratios.background} / {p.ratios.surface} / {p.ratios.accent}</span></button>)}</div>
-        <p className="composition-note">{preset.note} 这些比例是可调的构图起点。</p>
+        <div className="composition-context"><p className="composition-note">{context.name}场景：{context.summary} {preset.note}</p><button type="button" onClick={() => { const next = normaliseComposition({ presetId: context.presetId, ratios: context.ratios }); setComposition(next); setNotice(`已应用${context.name}起点。`); }}>应用{context.name}起点</button></div>
         <div className="composition-layout">
           <div className="composition-controls">
             <fieldset><legend>面积分工</legend><div className="composition-ratio-labels"><span>基底 <b>{ratios.background}%</b></span><span>辅助面 <b>{ratios.surface}%</b></span><span>强调 <b>{ratios.accent}%</b></span></div>

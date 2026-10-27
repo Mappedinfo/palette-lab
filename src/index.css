@@ -15,9 +15,9 @@
   --shadow-lg: 0 24px 70px -18px rgba(23, 21, 15, 0.28);
   --noise-opacity: 0;
 
-  --sans: 'Manrope', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --display: 'Syne', 'PingFang SC', sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --display: var(--sans);
+  --mono: ui-monospace, 'SF Mono', Menlo, monospace;
 
   font: 17px/1.6 var(--sans);
   color-scheme: light;

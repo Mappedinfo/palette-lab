@@ -1,158 +1,41 @@
-/**
- * 生成 AI 可读的站点文件（llms.txt / llms-full.txt）
- * 数据全部来自 src/data/colors.js，指标实时计算，与网站保持一致。
- * 用法：node scripts/generate-ai-files.mjs
- */
-import { writeFileSync, mkdirSync } from 'node:fs';
+/** Generate public color/type guidance from the same data as the website. */
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { GROUPS, ALL_COLORS, hexToRgb, hexToHsl, luminance, contrastRatio } from '../src/data/colors.js';
-import { COMPOSITION_PRESETS } from '../src/data/compositions.js';
+import { GROUPS, LEGACY_COLORS, ALL_COLORS, hexToRgb, hexToHsl, contrastRatio } from '../src/data/colors.js';
+import { COMPOSITION_PRESETS, SEMANTIC_COLORS } from '../src/data/compositions.js';
+import { USE_CASES } from '../src/data/use-cases.js';
+import { FONT_OPTIONS, TYPE_PROFILES } from '../src/data/typography.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const publicDir = join(__dirname, '..', 'public');
-mkdirSync(publicDir, { recursive: true });
-
-const SITE = 'https://mappedinfo.github.io/palette-lab/';
-
-// ─── 颜色明细行 ─────────────────────────────────────────────────────────
-function colorLines() {
-  return ALL_COLORS.map((c) => {
-    const [r, g, b] = hexToRgb(c.hex);
-    const hsl = hexToHsl(c.hex);
-    const lum = luminance(c.hex).toFixed(3);
-    const onWhite = contrastRatio(c.hex, '#ffffff').toFixed(2);
-    const onBlack = contrastRatio(c.hex, '#000000').toFixed(2);
-    // 角色分类：亮度主导；浅色基底 > 深色（文字/强调）> 高饱和强调 > 中性数据色
-    let role;
-    if (lum > 0.75) role = '浅色基底（适合大面积背景/填充）';
-    else if (lum < 0.35) role = '深色（适合文字/强调）';
-    else if (hsl.s > 70) role = '高饱和强调色（适合数据点/标注，勿作正文）';
-    else role = '中性数据色（适合图表序列）';
-    return `- ${c.name}（${c.en}）| HEX ${c.hex.toUpperCase()} | RGB ${r},${g},${b} | HSL ${hsl.h}°,${hsl.s}%,${hsl.l}% | 亮度 ${lum} | 白底对比度 ${onWhite}:1 | 黑底对比度 ${onBlack}:1 | ${role} | 所属组 ${c.group}`;
-  }).join('\n');
-}
-
-// ─── 搭配语义行 ─────────────────────────────────────────────────────────
-function groupLines() {
-  return GROUPS.map((g) => {
-    const hexes = g.colors.map((c) => c.hex.toUpperCase()).join(' + ');
-    let ratio = '';
-    if (g.colors.length === 2) {
-      ratio = ` | 组内对比度 ${contrastRatio(g.colors[0].hex, g.colors[1].hex).toFixed(2)}:1`;
-    }
-    return `- 组${g.id} ${g.name}（${g.en}）：${hexes}${ratio} — ${g.note}`;
-  }).join('\n');
-}
-
-// ─── 使用建议 ───────────────────────────────────────────────────────────
-const ADVICE = `## AI 配色建议（供生成图表/文档时参考）
-
-### 文字与背景
-- 深色文字可用：#9E1D1C（白底对比度 7.94:1，符合 WCAG AAA）、#008E6B（4.13:1，AA）、#EE1969（4.22:1，AA）、#6583E0（3.57:1，大字号可作 AA 大字）。
-- 纯白文字（#FFFFFF）在这 15 色上：朱砂 #9E1D1C（7.94:1）、翡翠 #008E6B（4.13:1）、品红 #EE1969（4.22:1）上可读性最好。
-- 浅色基底（适合大面积背景/填充）：#FBFFF2、#F1F6FF、#F5E6D0、#F2E1FF、#FFE59D。
-- 中性灰（#5C5749 类）不在这 15 色内，如需要辅助灰可自行补充，勿用高饱和色做正文。
-
-### 强调色（少而准）
-- 单组强调：琥珀 #FFD15D 或 品红 #EE1969 作为唯一强调色，其他全用灰阶。
-- 双色强调：珊瑚 #E97A46 + 翡翠 #008E6B（互补，适合正/负对比）；品红 #EE1969 + 天蓝 #64BBCF（暖冷对照）。
-- 避免将 #FFE59D、#90E0D6、#CCA4E3 等高亮浅色用作文字，它们适合填充和渐变。
-
-### 图表序列色（按类别区分）
-- 推荐序列：朱砂 #9E1D1C → 靛蓝 #6583E0 → 翡翠 #008E6B → 琥珀 #FFD15D → 品红 #EE1969 → 天蓝 #64BBCF → 珊瑚 #E97A46 → 青草 #61AC4C。
-- 若需区分 8 组数据，可用每组强调色：#64BBCF、#FFD15D、#9E1D1C、#EE1969、#E97A46、#61AC4C、#6583E0、#008E6B。
-
-### 深浅主题适配
-- 深色背景（#101114）推荐：#90E0D6、#64BBCF、#FFD15D、#E97A46、#90E0D6 等中高亮色做主系列，避免深色 #008E6B、#9E1D1C 直接作数据点。
-- 浅色背景（#FBF7F0 类）推荐：#9E1D1C、#008E6B、#6583E0、#EE1969 做主系列，浅色仅作基底。
-- 网站本身已实现浅/深双主题切换，可参考其对比度自动计算逻辑。
-
-### 无障碍（WCAG）
-- 正文对比度须 ≥ 4.5:1（AA），大字 ≥ 3:1。
-- 不预设任意两色都可用于正文；按真实前景／背景计算对比度。强调色也可以只用于色块，按钮文字在黑白中选择对比度更高者。
-- 组 1（#FFE59D 配 #64BBCF，1.77:1）仅适合装饰性渐变或大色块，不适合承载文字。`;
-
-// ─── llms.txt（入口索引）───────────────────────────────────────────────
-const LLMS_TXT = `# Palette Lab · 色卡实验室
-
-> Mappedinfo 开源的学术配色档案网站：15 个颜色、8 组搭配、逐色解析、全屏比较。
-> 本文件是给 AI/爬虫的站点入口；完整数据见 llms-full.txt，或直接访问网页。
-
-- 网站地址：${SITE}
-- 完整 AI 数据（推荐读取）：${SITE}llms-full.txt
-- 网页版（交互比较/剧场/复制色值）：${SITE}
-- 源码仓库：https://github.com/Mappedinfo/palette-lab
-
-## 站点能力
-1. 15 色全色档案：每色含 HEX/RGB/HSL、亮度、黑白底对比度、中文名/英文名、所属组。
-2. 8 组搭配语义：每组为「基底 + 强调」结构，含组内对比度与使用场景说明。
-3. 全屏比较：任意两色同屏对照 + 实时对比度（拖拽分割线，键盘 ←→↑↓ 换色）。
-4. 全屏剧场：15 色铺满全屏，hover 显色值、点击复制。
-5. 浅色/深色双主题切换，记忆用户偏好。
-6. 图片色彩提取（#extract）：拖入/粘贴（Ctrl/Cmd+V）/选择图片，本地 Canvas 解析主色（中位切分），自动给出绘图建议——对比度 ≥4.5:1 的可读文字色、饱和度最高的强调色、色盲（红/绿/蓝黄）可区分性警告、以及与 15 色档案的最近色映射。所有解析在浏览器本地完成，图片不上传。
-7. 手动精提工具（同一 #extract 区）：四种交互工具在图片上直接操作——「框选」拖拽矩形提取区域主色（适合分类图色块）、「涂抹」自由笔迹圈选范围取代表色、「吸管」点击取 5×5 邻域平均色、「色带」沿渐变色带划线等距采样（4/6/8/12/16 档），输出色带渐变序列。**支持多次操作：每次框选/涂抹/吸管结果追加保存为独立色卡，每次色带划线保存为独立色带卡片（编号 色带 1 / 色带 2 / …），每项均可单独删除，适合一张图包含多个色带或多个分类色块的场景。** 手动结果与自动结果并列展示，均可复制/进入全屏比较。
-8. 报告导出：提取区工具条「复制信息」一键把完整提取结果复制为 Markdown 文本（含自动主色表、手动提取表、色带序列、绘图建议、全部颜色清单），「下载」按钮直接保存为「原文件名-palette-report.md」，便于粘贴进笔记/文档。
-9. 全屏提取与自由缩放：工具条「全屏」进入全屏提取模式——大画布铺满窗口，滚轮以鼠标为中心自由缩放（50%–1600%），空格键或鼠标中键拖拽平移，双击/「适应」一键复位；缩放时四种手动工具坐标自动换算，框选/涂抹/吸管/色带在小图上也能精确定位。支持粘贴/拖拽图片，解析完成自动绘制（无需额外点击）。
-
-## 色彩数据速览（15 色）
-${colorLines()}
-
-## 搭配分组速览（8 组）
-${groupLines()}
-
-10. 配比实验（#composition）：四组按角色组织的清亮配色起点；调整基底／辅助面／强调色面积（总和100%）、自定义五种颜色角色，在工作台或阅读页预览，逐组合查看正文对比度，复制CSS或下载JSON；设置仅保存在当前浏览器。面积条表示准确比例，页面预览不声称实际像素占比。
-
-## 给 AI 的建议
-- 需要逐色指标（对比度、亮度、角色）或搭配建议时，读取 llms-full.txt。
-- 生成图表时优先遵循 WCAG 对比度规则：正文 ≥4.5:1，强调色少而准，深/浅主题分别选色。
-`;
-
-// ─── llms-full.txt（完整档案）──────────────────────────────────────────
-const LLMS_FULL = `# Palette Lab · 完整 AI 色彩档案
-
-站点：${SITE}（Mappedinfo · 开源学术配色档案）
-生成时间：自动生成于构建前，数据与网页完全一致。
-
-## 1. 颜色总表（15 色）
-
-${colorLines()}
-
-## 2. 搭配分组（8 组）
-
-${groupLines()}
-
-## 3. 关键对比度矩阵
-
-| 颜色 | 白底对比度 | 黑底对比度 | 亮度 |
-|---|---|---|---|
-${ALL_COLORS.map((c) => {
-  return `| ${c.hex.toUpperCase()} ${c.name} | ${contrastRatio(c.hex, '#ffffff').toFixed(2)}:1 | ${contrastRatio(c.hex, '#000000').toFixed(2)}:1 | ${luminance(c.hex).toFixed(3)} |`;
-}).join('\n')}
-
-> 对比度依据 WCAG 2.1 相对亮度公式计算。
-
-## 4. 组内搭配对比度
-
-${GROUPS.filter((g) => g.colors.length === 2).map((g) => {
-  return `- 组${g.id} ${g.name}：${g.colors[0].hex.toUpperCase()} ↔ ${g.colors[1].hex.toUpperCase()} = ${contrastRatio(g.colors[0].hex, g.colors[1].hex).toFixed(2)}:1`;
-}).join('\n')}
-
-## 5. 使用建议
-
-${ADVICE}
-
-## 6. 站点使用说明（给 AI 访问者）
-
-- 页面结构：Hero → 配比实验（#composition）→ 全色档案（#palette）→ 搭配方案（#groups）→ 图片提色（#extract）→ 页脚。
-- 交互：点击色卡打开详情；hover 色卡右上角按钮复制色值；分组卡片内「全屏比较」「剧场」按钮进入全屏模式。
-- 主题：右上角太阳/月亮按钮切换浅深色，偏好存 localStorage（key: palette-lab-theme）。
-- 技术：React 19 + Vite 8 + framer-motion，单页应用，路由为锚点。
-`;
-
-const compositionArchive = `\n\n## 7. 配比与角色实验\n\n面积比例是构图起点，不是无障碍标准。所有正文对比度按实际前景／背景组合计算。\n\n${COMPOSITION_PRESETS.map((p) => `- ${p.name}：${Object.entries(p.colors).map(([key, value]) => `${key} ${value}`).join(' · ')}；面积 ${p.ratios.background}/${p.ratios.surface}/${p.ratios.accent}。${p.note}`).join('\n')}\n\n参考：Carbon https://www.carbondesignsystem.com/building-blocks/foundations/color/tokens 与 Radix https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette 。\n`;
-
-writeFileSync(join(publicDir, 'llms.txt'), LLMS_TXT);
-writeFileSync(join(publicDir, 'llms-full.txt'), LLMS_FULL + compositionArchive);
-console.log('✓ public/llms.txt      ', LLMS_TXT.length, 'bytes');
-console.log('✓ public/llms-full.txt ', LLMS_FULL.length, 'bytes');
+const root = new URL('../', import.meta.url);
+const site = 'https://mappedinfo.github.io/palette-lab/';
+const roleCount = new Set(COMPOSITION_PRESETS.flatMap((p) => Object.values(p.colors))).size;
+const summary = `全色档案共 **${ALL_COLORS.length} 个去重色值**：经典搭配 ${LEGACY_COLORS.length} 色、界面角色 ${roleCount} 色、语义状态 ${Object.keys(SEMANTIC_COLORS).length} 色。来源之间有重复，同一 HEX 可以承担多个角色。数量直接由数据源生成。`;
+const features = [
+  '使用场合（#usage）：科研、汇报、艺术三种情境，共用配比与字号样张的场景选择。',
+  '配比实验（#composition）：调整基底／辅助面／强调色，合计100%；自定义五种角色色，工作台／阅读页预览，检查实际文字组合，复制CSS／下载JSON。面积条是精确比例，页面预览不代表实际像素面积。',
+  '字号字体（#typography）：按场景比较标题、正文、图注与数字，区分原始 pt／px 和屏幕显示缩放；导出保留原始字号。系统默认与三款OFL字体可选，外部字体只在选择后加载。',
+  `全色档案（#palette）：${ALL_COLORS.length} 个去重色值，保留来源与角色，支持搜索和来源筛选，查看HEX／RGB／HSL／黑白底对比度与复制。`,
+  `经典搭配（#groups）：保留${GROUPS.length}组灵感搭配；任意两色可全屏比较，拖动分割线；方向键换色，S交换，R随机，Esc关闭。搭配不自动成为定量色图。`,
+  '全屏剧场：遍历完整档案，点击复制色值。',
+  '图片提色（#extract）：拖入、粘贴或选择图片，本地Canvas解析主色；框选、涂抹、吸管、色带四种工具可多次保存独立结果和逐项删除。',
+  '提色报告：复制Markdown或下载报告，保留自动／手动主色、各条色带、使用建议与最近档案色映射。最近色和模拟色觉警告不代表完整可读性认证。',
+  '全屏提取：以鼠标为中心缩放、空格／中键平移、双击／适应复位，手动提取按缩放坐标映射。图片不上传。',
+  '网站UI主题由prefers-color-scheme决定并实时监听系统变化；旧手动主题缓存不参与。自选配色画布保持独立。',
+];
+const colors = ALL_COLORS.map((c) => {
+  const hsl = hexToHsl(c.hex);
+  return `| ${c.hex} | ${c.name} | ${hexToRgb(c.hex).join(', ')} | ${hsl.h}° ${hsl.s}% ${hsl.l}% | ${c.roles.join('、')} | ${contrastRatio(c.hex, '#FFFFFF').toFixed(2)}:1 | ${contrastRatio(c.hex, '#000000').toFixed(2)}:1 | ${c.origins.join(' / ')} |`;
+}).join('\n');
+const contexts = USE_CASES.map((c) => `### ${c.name}\n${c.summary}\n${c.goals.map((g) => `- ${g}`).join('\n')}\n- ${c.avoid}\n${c.references.map((ref) => `参考：${ref.name} ${ref.url}`).join('\n')}`).join('\n\n');
+const types = Object.entries(TYPE_PROFILES).map(([id, p]) => `- ${USE_CASES.find((c) => c.id === id).name}：${p.name}；${Object.entries(p.sizes).map(([key, n]) => `${key} ${n}${p.unit}`).join(' / ')}；样张缩放${p.zoom * 100}%。${p.note}`).join('\n');
+const fonts = FONT_OPTIONS.map((f) => `- ${f.name}：${f.license}。${f.note}${f.licenseUrl ? ` 许可：${f.licenseUrl}` : ''}`).join('\n');
+const entry = `# Palette Lab · 色卡实验室\n\n${summary}\n\n- 网站：${site}\n- 完整档案：${site}llms-full.txt\n- 源码：https://github.com/Mappedinfo/palette-lab\n\n## 站点能力\n${features.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n\n## 使用边界\n颜色按用途和实际角色判断。正文对比度4.5:1只评价相应组合，不证明色盲可区分、投影可读或定量映射有效。字体文件保留各自许可，网站不分发商业字体。\n`;
+const full = `${entry}\n## 颜色总表\n\n| HEX | 名称 | RGB | HSL | 角色 | 白底对比度 | 黑底对比度 | 来源 |\n|---|---|---|---|---|---|---|---|\n${colors}\n\n## 经典搭配\n${GROUPS.map((g) => `- ${g.name}：${g.colors.map((c) => c.hex).join(' + ')}。${g.note}`).join('\n')}\n\n## 配比起点\n${COMPOSITION_PRESETS.map((p) => `- ${p.name}：${Object.entries(p.colors).map(([key, hex]) => `${key} ${hex}`).join(' / ')}；面积${p.ratios.background}/${p.ratios.surface}/${p.ratios.accent}。`).join('\n')}\n\n## 按用途选择\n${contexts}\n\n## 字号样张\n${types}\n\npt按1pt=4/3 CSS px作屏幕展示；显示缩放不改变导出数值。上述尺寸是起点，不代替期刊、投影或媒介规范。\n\n## 字体与许可\n${fonts}\n\n默认不加载外部字体；选择开源字体后从Google Fonts按需加载。连接失败使用系统回退并显示状态。分发字体文件需遵守其相应许可。\n`;
+writeFileSync(new URL('public/llms.txt', root), entry);
+writeFileSync(new URL('public/llms-full.txt', root), full);
+const readme = new URL('README.md', root);
+const source = readFileSync(readme, 'utf8');
+const marker = /<!-- archive-summary:start -->[\s\S]*?<!-- archive-summary:end -->/;
+if (!marker.test(source)) throw new Error('README archive summary marker is missing');
+writeFileSync(readme, source.replace(marker, `<!-- archive-summary:start -->\n${summary}\n<!-- archive-summary:end -->`));
+console.log(`Generated color/type guidance from ${ALL_COLORS.length} unique colors and ${FONT_OPTIONS.length} font choices in ${fileURLToPath(root)}`);

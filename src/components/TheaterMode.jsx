@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { textOn } from '../data/colors';
 
-/** 全屏剧场：15 色铺满整个屏幕，hover 显示色值，点击复制。 */
+/** 全屏剧场：完整档案铺满整个屏幕，hover 显示色值，点击复制。 */
 export default function TheaterMode({ colors, onClose }) {
   const copy = async (hex) => {
     try {
