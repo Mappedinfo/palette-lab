@@ -1823,3 +1823,91 @@
   .compare__picker { padding: 12px 16px; }
   .site-footer__inner { flex-direction: column; text-align: center; }
 }
+
+
+/* ===== Composition Lab ===== */
+.site-nav { display: flex; gap: 24px; margin-left: auto; margin-right: 20px; font-size: 15px; font-weight: 650; }
+.site-nav a { text-decoration: none; text-underline-offset: 6px; }
+.site-nav a:hover { text-decoration: underline; }
+.hero { padding-block: clamp(52px, 6vw, 86px); }
+.hero h1 { font-size: clamp(44px, 5vw, 72px); max-width: 14ch; }
+.hero__halo { opacity: 0.2; }
+.hero__stat span { font-size: 14px; letter-spacing: 0.05em; }
+.swatch__name { font-size: 18px; }
+.swatch__name small, .swatch__spec, .group-card__cta button { font-size: 14px; }
+.composition-section { border-top: 1px solid var(--line); background: var(--surface); }
+.composition-section .eyebrow { margin-bottom: 12px; }
+.composition-section h2 { font-size: clamp(28px, 3vw, 40px); }
+.composition-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.composition-presets > button { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line-strong); border-radius: 12px; text-align: left; background: var(--bg); transition: border-color .15s; }
+.composition-presets > button[aria-pressed='true'] { border: 2px solid var(--ink); padding: 15px; }
+.composition-presets > button > b { font-size: 17px; }
+.composition-presets > button > span:last-child { font: 14px var(--mono); color: var(--ink-soft); }
+.composition-preset__colors { display: flex; gap: 4px; height: 32px; }
+.composition-preset__colors i { flex: 1; border: 1px solid rgba(0,0,0,.12); border-radius: 4px; }
+.composition-preset__colors i:first-child { flex: 3; }
+.composition-note { font-size: 14px; color: var(--ink-soft); line-height: 1.65; margin-top: 12px; }
+.composition-layout { display: grid; grid-template-columns: 320px minmax(0,1fr); gap: 28px; margin-top: 28px; align-items: start; }
+.composition-controls { display: grid; gap: 22px; }
+.composition-controls fieldset { border: 0; min-width: 0; }
+.composition-controls legend { font-size: 18px; font-weight: 750; margin-bottom: 14px; }
+.composition-ratio-labels { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.composition-ratio-labels span { display: grid; gap: 2px; color: var(--ink-soft); }
+.composition-ratio-labels b { font: 600 24px var(--mono); color: var(--ink); }
+.composition-slider { display: grid; gap: 6px; margin-top: 18px; font-size: 15px; }
+.composition-slider > span { display: flex; justify-content: space-between; }
+.composition-slider output { font-family: var(--mono); }
+.composition-slider input { width: 100%; accent-color: var(--ink); cursor: pointer; height: 24px; }
+.composition-ratio-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.composition-ratio-presets button { font-size: 14px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 8px; }
+.composition-ratio-presets button:hover { background: var(--bg-soft); }
+.composition-color-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 13px 10px; }
+.composition-color > label { display: block; font-size: 15px; margin-bottom: 5px; }
+.composition-color > div { display: flex; align-items: center; gap: 7px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--bg); }
+.composition-color input[type='color'] { border: 0; padding: 0; background: none; width: 28px; height: 28px; cursor: pointer; flex-shrink: 0; }
+.composition-color input[type='text'], .composition-color input[list] { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 14px var(--mono); }
+.composition-export { display: flex; flex-wrap: wrap; gap: 8px; }
+.composition-export button { display: inline-flex; gap: 7px; align-items: center; justify-content: center; padding: 10px 12px; font-size: 15px; border: 1px solid var(--line-strong); border-radius: 7px; }
+.composition-export button:first-child { background: var(--ink); color: var(--bg); }
+.composition-export .composition-reset { border: 0; padding-inline: 4px; }
+.composition-notice { min-height: 2.6em; font-size: 14px; color: var(--ink-soft); line-height: 1.6; margin-top: -10px; }
+.composition-stage { min-width: 0; }
+.composition-area { height: 76px; display: flex; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
+.composition-area > span { display: grid; place-items: center; font: 600 15px var(--mono); overflow: hidden; min-width: 0; transition: width .12s ease; }
+.composition-preview-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 22px 0 12px; font-size: 16px; }
+.composition-preview-head > div { display: flex; gap: 4px; border: 1px solid var(--line-strong); border-radius: 7px; padding: 3px; }
+.composition-preview-head button { font-size: 14px; padding: 5px 10px; border-radius: 4px; }
+.composition-preview-head button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
+.composition-page { display: flex; background: var(--lab-background); color: var(--lab-ink); border: 1px solid color-mix(in srgb, var(--lab-ink) 22%, var(--lab-background)); border-radius: 10px; overflow: hidden; }
+.composition-page__sidebar { width: 120px; flex-shrink: 0; background: var(--lab-surface); padding: 22px 12px; display: flex; flex-direction: column; gap: 18px; font-size: 15px; }
+.composition-page__sidebar b { font: 600 13px var(--mono); margin-bottom: 8px; }
+.composition-page__sidebar span { padding: 4px 7px; }
+.composition-page__sidebar .is-current { color: var(--lab-on-accent); background: var(--lab-accent); border-radius: 4px; }
+.composition-page__content { flex: 1; min-width: 0; padding: 24px; }
+.composition-page__top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--lab-muted); font-size: 14px; margin-bottom: 26px; }
+.composition-page h3 { font-size: 25px; letter-spacing: -.025em; line-height: 1.45; margin-bottom: 12px; }
+.composition-page p { font-size: 18px; line-height: 1.8; }
+.composition-page__cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 24px; }
+.composition-page__cards > div { background: var(--lab-surface); border-radius: 6px; padding: 14px; display: grid; gap: 5px; }
+.composition-page__cards b { font: 600 30px var(--mono); }
+.composition-page__cards span { font-size: 15px; }
+.composition-page__table { margin-top: 22px; font-size: 18px; }
+.composition-page__table > div { display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--lab-ink) 18%, var(--lab-background)); }
+.composition-page__table > div:first-child { font-size: 16px; }
+.composition-page__table > div > span:last-child { font-size: 15px; }
+.composition-page__bottom { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 24px; font-size: 15px; }
+.composition-page__bottom > span:last-child { color: var(--lab-muted); }
+.composition-page__action { color: var(--lab-on-accent); background: var(--lab-accent); padding: 8px 14px; border-radius: 5px; }
+.composition-page__quote { background: var(--lab-surface); border-left: 4px solid var(--lab-accent); margin: 24px 0; padding: 20px; font-size: 18px; }
+.composition-page--article .composition-page__content { padding: 30px; }
+.composition-contrast { margin-top: 24px; border-block: 1px solid var(--line); font-size: 15px; }
+.composition-contrast > div { display: grid; grid-template-columns: minmax(0,1fr) 100px 60px; gap: 12px; padding: 10px 0; }
+.composition-contrast > div:first-child { display: flex; justify-content: space-between; gap: 12px; }
+.composition-contrast > div:first-child span { color: var(--ink-soft); font-size: 14px; }
+.composition-contrast > div > b { font-variant-numeric: tabular-nums; }
+.composition-contrast .is-pass { color: #067647; }
+.composition-contrast .is-warning { color: #B42318; }
+[data-theme='dark'] .composition-contrast .is-pass { color: #75D9AC; }
+[data-theme='dark'] .composition-contrast .is-warning { color: #FFB3B3; }
+.composition-sources { margin-top: 24px; font-size: 14px; line-height: 1.75; color: var(--ink-soft); }
+.composition-sources a { text-underline-offset: 3px; }

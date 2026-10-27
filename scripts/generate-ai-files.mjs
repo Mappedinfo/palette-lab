@@ -6,7 +6,8 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { GROUPS, ALL_COLORS, hexToRgb, hexToHsl, luminance, contrastRatio, isLight } from '../src/data/colors.js';
+import { GROUPS, ALL_COLORS, hexToRgb, hexToHsl, luminance, contrastRatio } from '../src/data/colors.js';
+import { COMPOSITION_PRESETS } from '../src/data/compositions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
@@ -69,7 +70,7 @@ const ADVICE = `## AI 配色建议（供生成图表/文档时参考）
 
 ### 无障碍（WCAG）
 - 正文对比度须 ≥ 4.5:1（AA），大字 ≥ 3:1。
-- 组 3（#F5E6D0 配 #9E1D1C）与 组 8（#FBFFF2 配 #008E6B）是推荐的正文级搭配。
+- 不预设任意两色都可用于正文；按真实前景／背景计算对比度。强调色也可以只用于色块，按钮文字在黑白中选择对比度更高者。
 - 组 1（#FFE59D 配 #64BBCF，1.77:1）仅适合装饰性渐变或大色块，不适合承载文字。`;
 
 // ─── llms.txt（入口索引）───────────────────────────────────────────────
@@ -99,6 +100,8 @@ ${colorLines()}
 
 ## 搭配分组速览（8 组）
 ${groupLines()}
+
+10. 配比实验（#composition）：四组按角色组织的清亮配色起点；调整基底／辅助面／强调色面积（总和100%）、自定义五种颜色角色，在工作台或阅读页预览，逐组合查看正文对比度，复制CSS或下载JSON；设置仅保存在当前浏览器。面积条表示准确比例，页面预览不声称实际像素占比。
 
 ## 给 AI 的建议
 - 需要逐色指标（对比度、亮度、角色）或搭配建议时，读取 llms-full.txt。
@@ -141,13 +144,15 @@ ${ADVICE}
 
 ## 6. 站点使用说明（给 AI 访问者）
 
-- 页面结构：Hero（简介）→ 全色档案（#palette）→ 搭配方案（#groups）→ 页脚。
+- 页面结构：Hero → 配比实验（#composition）→ 全色档案（#palette）→ 搭配方案（#groups）→ 图片提色（#extract）→ 页脚。
 - 交互：点击色卡打开详情；hover 色卡右上角按钮复制色值；分组卡片内「全屏比较」「剧场」按钮进入全屏模式。
 - 主题：右上角太阳/月亮按钮切换浅深色，偏好存 localStorage（key: palette-lab-theme）。
 - 技术：React 19 + Vite 8 + framer-motion，单页应用，路由为锚点。
 `;
 
+const compositionArchive = `\n\n## 7. 配比与角色实验\n\n面积比例是构图起点，不是无障碍标准。所有正文对比度按实际前景／背景组合计算。\n\n${COMPOSITION_PRESETS.map((p) => `- ${p.name}：${Object.entries(p.colors).map(([key, value]) => `${key} ${value}`).join(' · ')}；面积 ${p.ratios.background}/${p.ratios.surface}/${p.ratios.accent}。${p.note}`).join('\n')}\n\n参考：Carbon https://www.carbondesignsystem.com/building-blocks/foundations/color/tokens 与 Radix https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette 。\n`;
+
 writeFileSync(join(publicDir, 'llms.txt'), LLMS_TXT);
-writeFileSync(join(publicDir, 'llms-full.txt'), LLMS_FULL);
+writeFileSync(join(publicDir, 'llms-full.txt'), LLMS_FULL + compositionArchive);
 console.log('✓ public/llms.txt      ', LLMS_TXT.length, 'bytes');
 console.log('✓ public/llms-full.txt ', LLMS_FULL.length, 'bytes');

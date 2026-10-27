@@ -136,5 +136,5 @@ export function isLight(hex) {
 }
 
 export function textOn(hex) {
-  return isLight(hex) ? '#1a1a1a' : '#ffffff';
+  return contrastRatio(hex, '#000000') >= contrastRatio(hex, '#FFFFFF') ? '#000000' : '#FFFFFF';
 }

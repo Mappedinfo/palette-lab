@@ -9,7 +9,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "build:gewu": "vite build --config vite.gewu.config.js"
+    "build:gewu": "vite build --config vite.gewu.config.js",
+    "test": "node --test src/lib/composition.test.js"
   },
   "dependencies": {
     "framer-motion": "^13.1.0",

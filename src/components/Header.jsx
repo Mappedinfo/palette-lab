@@ -15,6 +15,7 @@ export default function Header({ theme, onToggle, onTheater }) {
           <span className="brand__dot" aria-hidden="true" />
           Palette<span style={{ fontWeight: 400 }}>Lab</span>
         </a>
+        <nav className="site-nav" aria-label="实验室导航"><a href="#composition">配比实验</a><a href="#palette">全色档案</a><a href="#groups">搭配方案</a><a href="#extract">图片提色</a></nav>
         <div className="header-actions">
           <button className="icon-btn" onClick={onTheater} title="全屏剧场" aria-label="全屏剧场">
             <LayoutGrid size={17} />

@@ -75,20 +75,20 @@ export default function Hero({ onExplore }) {
           <motion.div variants={item}>
             <span className="eyebrow hero__eyebrow">
               <span className="hero__eyebrow-live" />
-              Mappedinfo · 学术配色档案
+              Mappedinfo · 色彩与界面
             </span>
           </motion.div>
 
           <motion.h1 variants={item}>
-            15 色
+            颜色选对，
             <br />
-            实验室
+            比例也对
             <span className="accent">。</span>
           </motion.h1>
 
           <motion.p variants={item} className="hero__sub">
-            一份为论文图表与数据可视化打磨的 15 色档案 —— 8 组搭配、逐色解析、
-            同屏对照。浅色深色皆宜，复制即用。
+            从颜色的面积与角色出发，在清亮页面中试配、对照与导出。
+            15 色档案、8 组搭配和图片提色，继续为图表与界面提供灵感。
           </motion.p>
 
           <motion.div variants={item} className="hero__stats">
@@ -101,8 +101,8 @@ export default function Hero({ onExplore }) {
               <span>Pairs</span>
             </div>
             <div className="hero__stat">
-              <b>2</b>
-              <span>Themes</span>
+              <b>4</b>
+              <span>Starting palettes</span>
             </div>
             <div className="hero__stat">
               <b>∞</b>
@@ -113,7 +113,7 @@ export default function Hero({ onExplore }) {
           <motion.div variants={item} style={{ marginTop: 36 }}>
             <button className="pill-btn" onClick={onExplore} style={{ padding: '13px 22px', fontSize: 14.5 }}>
               <ArrowDown size={16} />
-              浏览色卡
+              开始配比实验
             </button>
           </motion.div>
         </motion.div>
@@ -128,8 +128,8 @@ export default function Hero({ onExplore }) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.7, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
       >
-        {ALL_COLORS.map((c) => (
-          <span key={c.hex} style={{ background: c.hex, animationDelay: `${Math.random() * 3}s` }} />
+        {ALL_COLORS.map((c, i) => (
+          <span key={c.hex} style={{ background: c.hex, animationDelay: `${i * 0.15}s` }} />
         ))}
       </motion.div>
     </section>

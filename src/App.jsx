@@ -11,6 +11,7 @@ import CompareOverlay from './components/CompareOverlay';
 import TheaterMode from './components/TheaterMode';
 import Extractor from './components/Extractor';
 import Footer from './components/Footer';
+import CompositionLab from './components/CompositionLab';
 
 const THEME_KEY = 'palette-lab-theme';
 
@@ -32,7 +33,7 @@ export default function App() {
     if (typeof window !== 'undefined' && window.GEWU_PLUGIN?.api?.theme?.get) {
       return window.GEWU_PLUGIN.api.theme.get() === 'dark' ? 'dark' : 'light';
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'light';
   });
   const [selected, setSelected] = useState(null); // 详情弹窗
   const [compare, setCompare] = useState(null); // {a: hex, b: hex}
@@ -47,7 +48,7 @@ export default function App() {
   const toggleTheme = useCallback(() => {
     const next = theme === 'light' ? 'dark' : 'light';
     // 从按钮位置圆形展开的动效
-    setWipe(next === 'dark' ? '#101114' : '#fbfaf7');
+    setWipe(next === 'dark' ? '#101114' : '#ffffff');
     setTimeout(() => setTheme(next), 60);
     setTimeout(() => setWipe(null), 650);
   }, [theme]);
@@ -70,7 +71,9 @@ export default function App() {
       <Header theme={theme} onToggle={toggleTheme} onTheater={() => setTheater(true)} />
 
       <main>
-        <Hero onExplore={() => findEl('#palette')?.scrollIntoView({ behavior: 'smooth' })} />
+        <Hero onExplore={() => findEl('#composition')?.scrollIntoView({ behavior: 'smooth' })} />
+
+        <CompositionLab />
 
         <section id="palette" className="section">
           <div className="container">
